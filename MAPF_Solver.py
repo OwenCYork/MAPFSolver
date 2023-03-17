@@ -258,8 +258,15 @@ class ICTS():
                     if str(child) in newLayer:
                         newLayer[str(child)].addParent(newMDD[timestep-1][parent])
                     else:
-                        newLayer[str(child)] = MDD(child,[],[newMDD[timestep-1][parent]])
-                    newMDD[timestep-1][parent].addChild(newLayer[str(child)])
+                        if HEURISTICPRUNING:
+                            if self.distanceBetween(child,target) <= (cost-timestep):
+                                newLayer[str(child)] = MDD(child,[],[newMDD[timestep-1][parent]])
+                        else:
+                            newLayer[str(child)] = MDD(child,[],[newMDD[timestep-1][parent]])
+                    try:
+                        newMDD[timestep-1][parent].addChild(newLayer[str(child)])
+                    except KeyError:
+                        pass
 
             newMDD.append(newLayer)
 
@@ -280,7 +287,12 @@ class ICTS():
             output.append(layer)
         output.reverse()
         return output
-
+    
+    def distanceBetween(self,child,target):
+        childX, childY = str(child).split(" ")
+        targetX, targetY = str(target).split(" ")
+        distance = abs(int(childX) - int(targetX)) + abs(int(childY) - int(targetY))
+        return distance
 
 
 mapName = "maze-32-32-4.map"
@@ -322,7 +334,7 @@ scenFile.close()
 
 #Remove the first row that just states the version number
 scenario = scenario[1:] 
-NUMOFAGENTS = 4
+NUMOFAGENTS = 9
 startingVertices = {}
 targetVertices = {}
 
