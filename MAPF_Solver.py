@@ -2,9 +2,11 @@ import numpy as np
 from queue import PriorityQueue
 from math import sqrt
 import itertools
+import time
 
 PAIRWISEPRUNING = True
 HEURISTICPRUNING = True
+TIMEALLOWED = 120
 
 class GraphVertex():
     """A graph vertex. The use of multiple can form a graph.
@@ -164,17 +166,40 @@ class ICTS():
     def highlevel(self):
         costTree = ICT(layer=0)
         costTree.calculateRoot(self.startingVertices,self.targetVertices)
-        print(costTree.getContents())
+        #print(costTree.getContents())
         if self.lowLevel(costTree.getContents()):
             return costTree.getContents()
         else:
-            for i in self.startingVertices:
-                newCostTree = ICT(layer=1)
-                tempDict = costTree.getContents()
-                tempDict[i] += 1
-                newCostTree.setContents(tempDict)
-                if self.lowLevel(newCostTree.getContents()):
-                    return newCostTree.getContents()
+            lastLayer = []
+            lastLayer.append(costTree)
+            layer = 1
+            nextLayer = []
+            while True:
+                for tree in lastLayer:
+                    costs = tree.getContents()
+                    for i in self.startingVertices:
+                        costs = {}
+                        alreadyAdded = False
+                        for j in self.startingVertices:
+                            costs[j] = tree.getContents()[j]
+                        costs[i] += 1
+                        newTree = ICT(layer)
+                        newTree.setContents(costs)
+                        for k in nextLayer:
+                            if k.getContents == costs:
+                                alreadyAdded = True
+                        if not alreadyAdded:
+                            nextLayer.append(newTree)
+
+
+                for tree in nextLayer:
+                    if self.lowLevel(tree.getContents()):
+                        return tree.getContents()
+                    
+                    if time.time() > startTime + TIMEALLOWED:
+                        return None
+                lastLayer = nextLayer.copy()
+                layer += 1
 
     def lowLevel(self,costs):
         MDDs = {}
@@ -202,14 +227,15 @@ class ICTS():
         for i in MDDs:
             currentLayer.append(MDDs[i][timestep])
         maxCost = max(costs.values())+1
-        print(maxCost)
+        #print(maxCost)
         return self.checkIfPossible(maxCost,MDDs,currentLayer,0)
 
 
     def checkIfPossible(self,maxCost,MDDs,currentLayer,timestep):
         if timestep == maxCost:
             return True
-        
+        if time.time() > startTime + TIMEALLOWED:
+            return False
         possibleCombinations = list(itertools.product(*currentLayer))
         #print(possibleCombinations)
         
@@ -333,21 +359,31 @@ scenario = scenFile.readlines()
 scenFile.close()
 
 #Remove the first row that just states the version number
-scenario = scenario[1:] 
-NUMOFAGENTS = 9
-startingVertices = {}
-targetVertices = {}
+scenario = scenario[1:]
+for NUMOFAGENTS in range(1,100):
+    startingVertices = {}
+    targetVertices = {}
 
-for i in range(NUMOFAGENTS):
-    try:
-        agent = scenario[i].split("\t")
-        startingVertices[i] = graph[(agent[4] + " " + agent[5])]
-        targetVertices[i] = graph[(agent[6]+ " " + agent[7])]
-    except(KeyError):
+    for i in range(NUMOFAGENTS):
         try:
-            del startingVertices[i]
+            agent = scenario[i].split("\t")
+            startingVertices[i] = graph[(agent[4] + " " + agent[5])]
+            targetVertices[i] = graph[(agent[6]+ " " + agent[7])]
         except(KeyError):
-            pass
+            try:
+                del startingVertices[i]
+            except(KeyError):
+                pass
 
-solver = ICTS(graph,startingVertices,targetVertices)
-print(solver.highlevel())
+
+    global startTime
+    startTime = time.time()
+    
+    solver = ICTS(graph,startingVertices,targetVertices)
+    output = solver.highlevel()
+    print(NUMOFAGENTS)
+    if output:
+        print(output)
+    else:
+        print(output)
+        break
