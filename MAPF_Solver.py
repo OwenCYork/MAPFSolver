@@ -3,10 +3,11 @@ from queue import PriorityQueue
 from math import sqrt
 import itertools
 import time
+import gc
 
 PAIRWISEPRUNING = True
 HEURISTICPRUNING = True
-TIMEALLOWED = 120
+TIMEALLOWED = 60
 
 class GraphVertex():
     """A graph vertex. The use of multiple can form a graph.
@@ -221,6 +222,8 @@ class ICTS():
                     pairMDDs[i] = MDDs[i]
                 maxCost = max(pairCosts.values())+1
                 if not self.checkIfPossible(maxCost,pairMDDs,currentLayer,0):
+                    del pairMDDs
+                    gc.collect()
                     return False
         #print(currentLayer)
         currentLayer = []
@@ -228,11 +231,16 @@ class ICTS():
             currentLayer.append(MDDs[i][timestep])
         maxCost = max(costs.values())+1
         #print(maxCost)
-        return self.checkIfPossible(maxCost,MDDs,currentLayer,0)
+        output = self.checkIfPossible(maxCost,MDDs,currentLayer,0)
+        del MDDs
+        gc.collect()
+        return output 
 
 
     def checkIfPossible(self,maxCost,MDDs,currentLayer,timestep):
         if timestep == maxCost:
+            del MDDs
+            gc.collect()
             return True
         if time.time() > startTime + TIMEALLOWED:
             return False
@@ -321,7 +329,7 @@ class ICTS():
         return distance
 
 
-mapName = "maze-32-32-4.map"
+mapName = "room-32-32-4.map"
 mapFile = open(mapName,"r")
 mapLines = mapFile.readlines()
 mapFile.close()
@@ -353,7 +361,7 @@ for i in mapArea:
         if j != None:
             graph[str(j)] = j
 
-scenarioName = "maze-32-32-4-even-1.scen"
+scenarioName = "room-32-32-4.map-scen-even/scen-even/room-32-32-4-even-25.scen"
 scenFile = open(scenarioName,"r")
 scenario = scenFile.readlines()
 scenFile.close()
@@ -367,23 +375,32 @@ for NUMOFAGENTS in range(1,100):
     for i in range(NUMOFAGENTS):
         try:
             agent = scenario[i].split("\t")
-            startingVertices[i] = graph[(agent[4] + " " + agent[5])]
-            targetVertices[i] = graph[(agent[6]+ " " + agent[7])]
+            startingVertices[i] = graph[(agent[5] + " " + agent[4])]
+            targetVertices[i] = graph[(agent[7]+ " " + agent[6])]
         except(KeyError):
             try:
                 del startingVertices[i]
+                gc.collect()
             except(KeyError):
                 pass
-
-
-    global startTime
-    startTime = time.time()
     
-    solver = ICTS(graph,startingVertices,targetVertices)
-    output = solver.highlevel()
-    print(NUMOFAGENTS)
-    if output:
-        print(output)
-    else:
-        print(output)
-        break
+    
+    if startingVertices != {}:
+        startTime = time.time()
+        
+        solver = ICTS(graph,startingVertices,targetVertices)
+        output = solver.highlevel()
+        print(NUMOFAGENTS)
+        if output:
+            print(output)
+        else:
+            print(output)
+            break
+    
+        del solver
+        del startTime
+        del startingVertices
+        del targetVertices
+        del output
+        del agent
+        gc.collect()
