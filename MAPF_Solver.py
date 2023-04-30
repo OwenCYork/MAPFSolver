@@ -92,8 +92,10 @@ class ICT(Tree):
     ####Methods
     calculateRoot(startingVertices, targetVertices): dict
         Calculates the costs for each agent at the root of the tree
-    
-    
+    aStar(start,goal): int
+        Performs and A* search from the start vertex to the goal vertex and returns the path cost
+    calculateHeuristic(start,end): float
+        Returns the straight line distance between two vertices
     """
     def __init__(self,layer):
         #super().__init__(self,children)
@@ -138,6 +140,21 @@ class ICT(Tree):
         return self.contents
 
 class MDD(Tree):
+    """A class for defining the Multi-Value Decision Diagram data structure
+    #### Attributes
+    children: list
+        A list of all MDDs branching off of this MDD
+    parents: list
+        A list of all the MDDs that have this MDD as a child
+    layer: int
+        Defines how far down the MDD the node is
+    
+    #### Methods
+    addParent(child):
+        Appends a parent to the list of parents
+    getParents(): list
+        Returns the list of parents
+    """
     def __init__(self,contents,children,parents):
         #super().__init__(self,children)
         self.children = []
@@ -157,6 +174,30 @@ class MDD(Tree):
         return self.contents
 
 class ICTS():
+    """A class for running the Increasing Cost Tree Search algorithm on a graph
+    #### Attributes
+    graph: dict
+        A dictionary containing all the vertices in the graph
+    startingVertices: dict
+        A dictionary containing the starting vertex for each agent
+    targetVerices: dict
+        A dictionary containing the target vertex for each agent
+    
+    #### Methods
+    highLevel(child): dict
+        Runs the high-level algorithm. 
+        Constructing an Increasing Cost Tree and then searching it for a valid solution using a best-first search
+    lowLevel(costs): dict
+        Runs the low-level algorithm.
+        Constructing an MDD for each of the agents' possible paths and then comparing them in order to find out if there are any conflicts
+    checkIfPossible(maxCost,MDDs,currentLayer,timestep): Bool
+        A recursive function that compares a list of MDDs against each other to see if there are any conflicts.
+        The base case is if the timestep is the same as the highest individual path cost.
+    buildMDD(start,target,cost): MDD
+        Constructs an MDD for an agent with depth cost and a root start
+    distanceBetween(child,target): int
+        Used in the heuristic-based pruning to calculate manhatten distance between two verices
+    """    
     def __init__(self,G,s,t):
         self.graph = G
         self.startingVertices = s
@@ -209,7 +250,7 @@ class ICTS():
         
         timestep = 0
 
-
+        #If pairwise pruning is enabled then pairs of MDDs are checked first to see if there are any conflicts
         if PAIRWISEPRUNING:
             pairs = list(itertools.combinations(MDDs,2))
             for pair in pairs:
@@ -292,6 +333,8 @@ class ICTS():
                     if str(child) in newLayer:
                         newLayer[str(child)].addParent(newMDD[timestep-1][parent])
                     else:
+                        #If heuristic-based pruning is enabled, check if the manhatten distance between a node and the target is larger 
+                        # than the remaining cost and delete the node if it is
                         if HEURISTICPRUNING:
                             if self.distanceBetween(child,target) <= (cost-timestep):
                                 newLayer[str(child)] = MDD(child,[],[newMDD[timestep-1][parent]])
@@ -328,11 +371,14 @@ class ICTS():
         distance = abs(int(childX) - int(targetX)) + abs(int(childY) - int(targetY))
         return distance
 
-
-mapName = "room-32-32-4.map"
+""" The map and scenario files used for testing were taken from:
+    www.movingai.com/benchmarks/mapf/index.html"""
+mapName = "benchmarks/room-32-32-4.map"
 mapFile = open(mapName,"r")
 mapLines = mapFile.readlines()
 mapFile.close()
+
+#Converts the map file into a graph for use with the solver
 
 height = int(mapLines[1].split(" ")[1])
 width = int(mapLines[2].split(" ")[1])
@@ -361,13 +407,17 @@ for i in mapArea:
         if j != None:
             graph[str(j)] = j
 
-scenarioName = "room-32-32-4.map-scen-even/scen-even/room-32-32-4-even-25.scen"
+""" The map and scenario files used for testing were taken from:
+    www.movingai.com/benchmarks/mapf/index.html"""
+scenarioName = "benchmarks/room-32-32-4.map-scen-even/scen-even/room-32-32-4-even-25.scen"
 scenFile = open(scenarioName,"r")
 scenario = scenFile.readlines()
 scenFile.close()
 
 #Remove the first row that just states the version number
 scenario = scenario[1:]
+
+#Runs the scenarios until one cannot be solved in under 60 seconds
 for NUMOFAGENTS in range(1,100):
     startingVertices = {}
     targetVertices = {}
@@ -396,7 +446,8 @@ for NUMOFAGENTS in range(1,100):
         else:
             print(output)
             break
-    
+
+        #Clears the memory
         del solver
         del startTime
         del startingVertices
